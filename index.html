@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可转债双低 · 周度面板</title>
+<style>
+  :root { color-scheme: light dark; }
+  .viz-root {
+    color-scheme: light;
+    --page:           #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-line:    #2a78d6;   /* 净值/中枢 单序列 */
+    --up:             #e34948;   /* 红涨 (A股惯例, 极性由柱方向承载) */
+    --down:           #008300;   /* 绿跌 */
+    --st-good:        #0ca30c;
+    --st-warn:        #fab219;
+    --st-crit:        #d03b3b;
+    --good-text:      #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface-1: #1a1a19;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+      --series-line: #3987e5; --up: #e66767; --down: #0ca30c; --good-text: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --series-line: #3987e5; --up: #e66767; --down: #0ca30c; --good-text: #0ca30c;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body.viz-root {
+    background: var(--page); color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  h1 { font-size: 20px; font-weight: 700; }
+  .sub { color: var(--text-muted); font-size: 13px; }
+  .toggle { border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+            border-radius: 8px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 22px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .tile .k { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .tile .v { font-size: 24px; font-weight: 700; }
+  .tile .d { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .light-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+                 border-radius: 999px; padding: 2px 10px; border: 1px solid var(--border); }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+          padding: 16px 16px 12px; margin-bottom: 22px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .card .note { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  svg text { font-family: inherit; }
+  .axis-label { font-size: 11px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin: 6px 2px 0; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 12px;
+       border-bottom: 1px solid var(--grid); padding: 6px 8px; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; }
+  .badge-new { font-size: 11px; color: var(--good-text); border: 1px solid currentColor;
+               border-radius: 6px; padding: 0 5px; margin-left: 6px; }
+  #tooltip { position: fixed; pointer-events: none; background: var(--surface-1); color: var(--text-primary);
+             border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px;
+             box-shadow: 0 4px 14px rgba(0,0,0,.18); opacity: 0; transition: opacity .1s; z-index: 10;
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scroll-x { overflow-x: auto; }
+  .err { color: var(--st-crit); font-size: 14px; padding: 30px 0; text-align: center; }
+  @media (max-width: 560px) { .tile .v { font-size: 20px; } }
+</style>
+</head>
+<body class="viz-root">
+<div class="wrap">
+  <header>
+    <div>
+      <h1>可转债双低 · 周度面板</h1>
+      <div class="sub" id="updated">加载中…</div>
+    </div>
+    <button class="toggle" id="themeBtn">🌓 深色/浅色</button>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>本周持仓名单（双低最低 20 只，等权）</h2>
+    <div class="note">排雷规则：价格≥100 · 评级≥AA- · 正股无基本面雷 ｜ 每周五收盘调仓</div>
+    <div class="scroll-x"><table id="holdTable"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>每周收益</h2>
+    <div class="note">上周五收盘 → 本周五收盘，等权、费前（净值曲线已扣换手成本）</div>
+    <div id="barChart"></div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--up)"></span>上涨周</span>
+      <span><span class="sw" style="background:var(--down)"></span>下跌周</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>累计净值</h2>
+    <div class="note">起点 1.000，已扣双边 0.1% 换手成本</div>
+    <div id="navChart"></div>
+  </div>
+
+  <div class="card">
+    <h2>溢价率中枢（全市场转股溢价率中位数）</h2>
+    <div class="note">虚线为近 3 年 60 / 85 分位阈值：高于 85 分位 = 🔴 高位轻仓区</div>
+    <div id="premChart"></div>
+  </div>
+
+  <div class="card">
+    <h2>历史记录</h2>
+    <div class="scroll-x"><table id="histTable"></table></div>
+  </div>
+</div>
+<div id="tooltip"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const tt = $('#tooltip');
+const fmtPct = (x, d=2) => (x >= 0 ? '+' : '') + (x * 100).toFixed(d) + '%';
+const showTT = (e, html) => { tt.innerHTML = html; tt.style.opacity = 1;
+  const pad = 12, w = tt.offsetWidth;
+  tt.style.left = Math.min(e.clientX + pad, innerWidth - w - 8) + 'px';
+  tt.style.top = (e.clientY - 36) + 'px'; };
+const hideTT = () => tt.style.opacity = 0;
+
+$('#themeBtn').onclick = () => {
+  const r = document.documentElement;
+  const cur = r.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  r.dataset.theme = cur === 'dark' ? 'light' : 'dark';
+  render();  // 重绘图表以套用新配色
+};
+
+let RECORDS = null, PREMS = null;
+
+async function load() {
+  try {
+    const [rj, pc] = await Promise.all([
+      fetch('data/holdings.json').then(r => r.json()),
+      fetch('data/premium_history.csv').then(r => r.text()),
+    ]);
+    RECORDS = rj;
+    PREMS = pc.trim().split('\n').slice(1).map(l => {
+      const [d, v] = l.split(','); return { d, v: +v };
+    }).filter(x => x.d && isFinite(x.v));
+    render();
+  } catch (e) {
+    document.querySelector('.wrap').insertAdjacentHTML('beforeend',
+      `<div class="err">数据加载失败（请通过 GitHub Pages 访问，而不是直接打开文件）<br>${e}</div>`);
+  }
+}
+
+function css(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+
+function render() {
+  if (!RECORDS) return;
+  const rs = RECORDS, last = rs[rs.length - 1], prev = rs.length > 1 ? rs[rs.length - 2] : null;
+  $('#updated').textContent = `最近更新：${last.date} ｜ 共 ${rs.length} 期`;
+
+  // ---- 状态灯 ----
+  const lights = { red: ['🔴', '高位 · 轻仓', 'var(--st-crit)'], yellow: ['🟡', '中高位 · 降预期', 'var(--st-warn)'], green: ['🟢', '中低位 · 正常', 'var(--st-good)'] };
+  const li = lights[last.light || (last.center_pct3y > 85 ? 'red' : last.center_pct3y > 60 ? 'yellow' : 'green')];
+
+  // ---- 指标卡 ----
+  const cum = last.cum_nav - 1;
+  const wk = last.week_return;
+  $('#tiles').innerHTML = `
+    <div class="tile"><div class="k">溢价率中枢</div><div class="v">${last.center.toFixed(1)}%</div>
+      <div class="d"><span class="light-badge">${li[0]} ${li[1]}</span></div>
+      <div class="d">3 年分位 ${last.center_pct3y.toFixed(0)}%</div></div>
+    <div class="tile"><div class="k">本周收益</div><div class="v">${wk == null ? '—' : fmtPct(wk)}</div>
+      <div class="d">${wk == null ? '首期建仓' : '20 只等权'}</div></div>
+    <div class="tile"><div class="k">累计净值</div><div class="v">${last.cum_nav.toFixed(4)}</div>
+      <div class="d">累计 ${fmtPct(cum)}（费后）</div></div>
+    <div class="tile"><div class="k">本期换手</div><div class="v">${last.turnover == null ? '—' : (last.turnover * 100).toFixed(0) + '%'}</div>
+      <div class="d">持仓 ${last.holdings.length} 只</div></div>`;
+
+  // ---- 持仓表 ----
+  const prevCodes = prev ? new Set(prev.holdings.map(h => h.code)) : null;
+  $('#holdTable').innerHTML = `<tr><th>#</th><th>代码</th><th>名称</th><th class="num">现价</th><th class="num">溢价率</th><th class="num">双低值</th><th>评级</th></tr>` +
+    last.holdings.map((h, i) => `<tr><td>${i + 1}</td><td>${h.code}</td>
+      <td>${h.name}${prevCodes && !prevCodes.has(h.code) ? '<span class="badge-new">新</span>' : ''}</td>
+      <td class="num">${h.price.toFixed(2)}</td><td class="num">${h.prem.toFixed(1)}%</td>
+      <td class="num"><b>${h.dl.toFixed(1)}</b></td><td>${h.rating}</td></tr>`).join('');
+
+  // ---- 历史表 ----
+  $('#histTable').innerHTML = `<tr><th>日期</th><th class="num">周收益</th><th class="num">净值</th><th class="num">中枢</th><th class="num">3年分位</th><th class="num">换手</th></tr>` +
+    [...rs].reverse().map(r => `<tr><td>${r.date}</td>
+      <td class="num">${r.week_return == null ? '—' : fmtPct(r.week_return)}</td>
+      <td class="num">${r.cum_nav.toFixed(4)}</td><td class="num">${r.center.toFixed(1)}%</td>
+      <td class="num">${r.center_pct3y.toFixed(0)}%</td>
+      <td class="num">${r.turnover == null ? '—' : (r.turnover * 100).toFixed(0) + '%'}</td></tr>`).join('');
+
+  drawBars(); drawNav(); drawPrem();
+}
+
+// ---------- 每周收益柱状图 ----------
+function drawBars() {
+  const data = RECORDS.filter(r => r.week_return != null);
+  const W = 920, H = 240, m = { t: 16, r: 12, b: 26, l: 46 };
+  const el = $('#barChart');
+  if (!data.length) { el.innerHTML = '<div class="note">首期建仓后，下周五产生第一根收益柱</div>'; return; }
+  const vmax = Math.max(0.005, ...data.map(d => Math.abs(d.week_return)));
+  const y = v => m.t + (H - m.t - m.b) * (1 - (v + vmax) / (2 * vmax));
+  const iw = (W - m.l - m.r) / data.length, bw = Math.min(34, Math.max(6, iw - 4));
+  let g = gridY(H, m, W, [-vmax, -vmax / 2, 0, vmax / 2, vmax], v => fmtPct(v, 1));
+  data.forEach((d, i) => {
+    const x = m.l + iw * i + (iw - bw) / 2, v = d.week_return;
+    const y0 = y(0), y1 = y(v), top = Math.min(y0, y1), hgt = Math.max(2, Math.abs(y1 - y0));
+    const col = v >= 0 ? css('--up') : css('--down');
+    const rxTop = v >= 0 ? 4 : 0, rxBot = v >= 0 ? 0 : 4;
+    g += `<path d="${roundedBar(x, top, bw, hgt, v >= 0 ? 4 : 0, v >= 0 ? 0 : 4)}" fill="${col}"
+      data-i="${i}" class="bar" style="cursor:pointer"></path>`;
+    if (data.length <= 26) g += `<text class="axis-label" x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${d.date.slice(5)}</text>`;
+  });
+  el.innerHTML = svgWrap(W, H, g);
+  el.querySelectorAll('.bar').forEach(b => {
+    b.onmousemove = e => { const d = data[+b.dataset.i];
+      showTT(e, `<b>${d.date}</b><br>周收益 ${fmtPct(d.week_return)}<br>净值 ${d.cum_nav.toFixed(4)} · 换手 ${(d.turnover * 100).toFixed(0)}%`); };
+    b.onmouseleave = hideTT;
+  });
+}
+
+// ---------- 累计净值折线 ----------
+function drawNav() {
+  const data = RECORDS.map(r => ({ d: r.date, v: r.cum_nav }));
+  drawLine('#navChart', data, v => v.toFixed(3), css('--series-line'),
+    (d, e) => showTT(e, `<b>${d.d}</b><br>净值 ${d.v.toFixed(4)}`), true);
+}
+
+// ---------- 溢价率中枢 ----------
+function drawPrem() {
+  const step = Math.max(1, Math.floor(PREMS.length / 700));
+  const data = PREMS.filter((_, i) => i % step === 0 || i === PREMS.length - 1).map(p => ({ d: p.d, v: p.v }));
+  const w3 = PREMS.slice(-756).map(p => p.v).sort((a, b) => a - b);
+  const q = p => w3[Math.floor(p * (w3.length - 1))];
+  drawLine('#premChart', data, v => v.toFixed(0) + '%', css('--series-line'),
+    (d, e) => showTT(e, `<b>${d.d}</b><br>中枢 ${d.v.toFixed(1)}%`), false,
+    [{ v: q(0.85), label: '85分位', col: css('--st-crit') }, { v: q(0.60), label: '60分位', col: css('--st-warn') }]);
+}
+
+// ---------- 通用绘图 ----------
+function svgWrap(W, H, inner) {
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${inner}</svg>`;
+}
+function gridY(H, m, W, ticks, fmt) {
+  const lo = Math.min(...ticks), hi = Math.max(...ticks);
+  const y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+  return ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"
+      stroke="${Math.abs(v) < 1e-9 ? css('--baseline') : css('--grid')}" stroke-width="1"></line>
+    <text class="axis-label" x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v)}</text>`).join('');
+}
+function roundedBar(x, y, w, h, rTop, rBot) {
+  rTop = Math.min(rTop, h / 2, w / 2); rBot = Math.min(rBot, h / 2, w / 2);
+  return `M${x},${y + rTop} a${rTop},${rTop} 0 0 1 ${rTop},-${rTop} h${w - 2 * rTop} a${rTop},${rTop} 0 0 1 ${rTop},${rTop}
+    v${h - rTop - rBot} a${rBot},${rBot} 0 0 1 -${rBot},${rBot} h-${w - 2 * rBot} a${rBot},${rBot} 0 0 1 -${rBot},-${rBot} z`;
+}
+function drawLine(sel, data, fmtV, color, onHover, area, refs) {
+  const W = 920, H = 240, m = { t: 16, r: 12, b: 26, l: 52 };
+  const el = $(sel);
+  if (data.length < 2) { el.innerHTML = '<div class="note">数据积累中，两期后显示曲线</div>'; return; }
+  let lo = Math.min(...data.map(p => p.v)), hi = Math.max(...data.map(p => p.v));
+  (refs || []).forEach(r => { lo = Math.min(lo, r.v); hi = Math.max(hi, r.v); });
+  const pad = (hi - lo) * 0.08 || 0.01; lo -= pad; hi += pad;
+  const x = i => m.l + (W - m.l - m.r) * (i / (data.length - 1));
+  const y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+  const ticks = [lo + pad, (lo + hi) / 2, hi - pad];
+  let g = gridY(H, m, W, ticks, fmtV);
+  const path = data.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  if (area) g += `<path d="${path} L${x(data.length - 1)},${H - m.b} L${m.l},${H - m.b} Z" fill="${color}" opacity="0.08"></path>`;
+  (refs || []).forEach(r => {
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(r.v)}" y2="${y(r.v)}" stroke="${r.col}" stroke-width="1" stroke-dasharray="5,4" opacity="0.7"></line>
+      <text class="axis-label" x="${W - m.r}" y="${y(r.v) - 4}" text-anchor="end" fill="${r.col}">${r.label} ${r.v.toFixed(0)}%</text>`;
+  });
+  g += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"></path>`;
+  const lastP = data[data.length - 1];
+  g += `<circle cx="${x(data.length - 1)}" cy="${y(lastP.v)}" r="4" fill="${color}" stroke="${css('--surface-1')}" stroke-width="2"></circle>`;
+  // 悬停层: 十字线 + 最近点
+  g += `<line id="xh${sel.slice(1)}" y1="${m.t}" y2="${H - m.b}" stroke="${css('--baseline')}" stroke-width="1" opacity="0"></line>
+    <rect x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent"></rect>`;
+  // x 轴首尾标签
+  g += `<text class="axis-label" x="${m.l}" y="${H - 8}">${data[0].d}</text>
+    <text class="axis-label" x="${W - m.r}" y="${H - 8}" text-anchor="end">${lastP.d}</text>`;
+  el.innerHTML = svgWrap(W, H, g);
+  const svg = el.querySelector('svg'), xh = el.querySelector(`#xh${sel.slice(1)}`);
+  svg.onmousemove = e => {
+    const r = svg.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width * W;
+    const i = Math.round((px - m.l) / (W - m.l - m.r) * (data.length - 1));
+    if (i < 0 || i >= data.length) return;
+    xh.setAttribute('x1', x(i)); xh.setAttribute('x2', x(i)); xh.setAttribute('opacity', 0.6);
+    onHover(data[i], e);
+  };
+  svg.onmouseleave = () => { xh.setAttribute('opacity', 0); hideTT(); };
+}
+
+load();
+</script>
+</body>
+</html>

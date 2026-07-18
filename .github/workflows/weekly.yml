@@ -1,0 +1,41 @@
+name: weekly-cb-run
+
+on:
+  schedule:
+    - cron: '31 6 * * 5'   # UTC 06:31 周五 = 北京时间 14:31, Actions 通常延迟 3-15 分钟, 落在尾盘窗口
+  workflow_dispatch: {}     # 支持手动触发
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-run
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run weekly strategy
+        run: python scripts/weekly_run.py
+
+      - name: Commit & push data
+        run: |
+          git config user.name "cb-weekly-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet && echo "no changes" || {
+            git commit -m "weekly run $(date -u +%F)"
+            git push
+          }
