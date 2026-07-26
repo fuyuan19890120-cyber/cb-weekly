@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""cb-weekly 每周自动运行 (GitHub Actions, 北京时间周五 14:35 前后)
-流程: 拉实时快照 -> 结算上周持仓收益 -> 更新溢价率中枢 -> 排雷选出新一期双低20只 -> 写回 data/
+"""cb-weekly 双周自动运行 (GitHub Actions, 北京时间周五 14:35 前后, 每两周)
+流程: 拉实时快照 -> 结算上期持仓收益 -> 更新溢价率中枢 -> 排雷选出新一期双低20只 -> 写回 data/
+排雷: 价格≥100 + 评级≥AA- + 正股基本面 + 剩余规模≥0.3亿 (Tushare)
 幂等: 同一天重复运行会覆盖当天记录而不是重复追加
 """
 import socket
@@ -8,13 +9,14 @@ socket.setdefaulttimeout(25)
 import akshare as ak
 import pandas as pd
 import numpy as np
-import json, os, sys, time
+import json, os, sys, time, sqlite3
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 DATA = Path(os.environ.get("CB_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 N = 20
 COST_RT = 0.001            # 双边成本, 计入净值
+MIN_SIZE_YI = 0.3           # 最小剩余规模(亿), Tushare remain_size
 GOOD = {"AAA", "AA+", "AA", "AA-", "AA+sti", "AAsti", "AA-sti"}
 CST = timezone(timedelta(hours=8))
 today = datetime.now(CST).strftime("%Y-%m-%d")
@@ -41,6 +43,19 @@ spot["name"] = spot["债券简称"].astype(str)
 live = spot[spot.price.gt(0) & spot.prem.between(-40, 500)].copy()
 live["dl"] = live.price + live.prem
 print(f"存续转债 {len(live)} 只 @ {today}")
+
+# ---------- 加载 Tushare remain_size (排除微型债) ----------
+size_ok = set()
+size_cache = DATA / "remain_size.csv"
+if size_cache.exists():
+    sz_df = pd.read_csv(size_cache, dtype=str)
+    sz_df['remain_size_yi'] = pd.to_numeric(sz_df['remain_size'], errors='coerce') / 100_000_000
+    size_ok = set(sz_df[sz_df['remain_size_yi'] >= MIN_SIZE_YI]['code6'])
+    print(f"剩余规模≥{MIN_SIZE_YI}亿: {len(size_ok)} 只缓存")
+else:
+    # GitHub Actions 无法连 Tushare, 使用宽松默认(全部通过)
+    size_ok = set(live.code)
+    print("无 remain_size 缓存, 跳过规模过滤")
 
 # ---------- 载入历史 ----------
 hist = pd.read_csv(DATA / "premium_history.csv", parse_dates=["date"]).set_index("date")["median_prem"]
@@ -73,7 +88,7 @@ pct3y = float((window <= center).mean() * 100)
 light = "red" if pct3y > 85 else ("yellow" if pct3y > 60 else "green")
 
 # ---------- 排雷 + 新一期名单 ----------
-qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined)]
+qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)]
 top = qual.nsmallest(N, "dl")
 new_hold = [{"code": r.code, "name": r.name, "price": round(r.price, 2), "prem": round(r.prem, 1),
              "dl": round(r.dl, 1), "rating": r.rating} for r in top.itertuples()]

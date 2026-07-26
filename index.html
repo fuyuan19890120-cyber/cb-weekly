@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>可转债双低 · 周度面板</title>
+<title>可转债双低 · 双周面板</title>
 <style>
   :root { color-scheme: light dark; }
   .viz-root {
@@ -88,7 +88,7 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>可转债双低 · 周度面板</h1>
+      <h1>可转债双低 · 双周面板</h1>
       <div class="sub" id="updated">加载中…</div>
     </div>
     <button class="toggle" id="themeBtn">🌓 深色/浅色</button>
@@ -98,13 +98,13 @@
 
   <div class="card">
     <h2>本周持仓名单（双低最低 20 只，等权）</h2>
-    <div class="note">排雷规则：价格≥100 · 评级≥AA- · 正股无基本面雷 ｜ 每周五收盘调仓</div>
+    <div class="note">排雷规则：价格≥100 · 评级≥AA- · 正股无基本面雷 · 剩余规模≥0.3亿 ｜ 双周五收盘调仓</div>
     <div class="scroll-x"><table id="holdTable"></table></div>
   </div>
 
   <div class="card">
-    <h2>每周收益</h2>
-    <div class="note">上周五收盘 → 本周五收盘，等权、费前（净值曲线已扣换手成本）</div>
+    <h2>每期收益</h2>
+    <div class="note">上期周五收盘 → 本期周五收盘，等权、费前（净值曲线已扣换手成本）</div>
     <div id="barChart"></div>
     <div class="legend">
       <span><span class="sw" style="background:var(--up)"></span>上涨周</span>
@@ -185,7 +185,7 @@ function render() {
     <div class="tile"><div class="k">溢价率中枢</div><div class="v">${last.center.toFixed(1)}%</div>
       <div class="d"><span class="light-badge">${li[0]} ${li[1]}</span></div>
       <div class="d">3 年分位 ${last.center_pct3y.toFixed(0)}%</div></div>
-    <div class="tile"><div class="k">本周收益</div><div class="v">${wk == null ? '—' : fmtPct(wk)}</div>
+    <div class="tile"><div class="k">本期收益</div><div class="v">${wk == null ? '—' : fmtPct(wk)}</div>
       <div class="d">${wk == null ? '首期建仓' : '20 只等权'}</div></div>
     <div class="tile"><div class="k">累计净值</div><div class="v">${last.cum_nav.toFixed(4)}</div>
       <div class="d">累计 ${fmtPct(cum)}（费后）</div></div>
@@ -201,7 +201,7 @@ function render() {
       <td class="num"><b>${h.dl.toFixed(1)}</b></td><td>${h.rating}</td></tr>`).join('');
 
   // ---- 历史表 ----
-  $('#histTable').innerHTML = `<tr><th>日期</th><th class="num">周收益</th><th class="num">净值</th><th class="num">中枢</th><th class="num">3年分位</th><th class="num">换手</th></tr>` +
+  $('#histTable').innerHTML = `<tr><th>日期</th><th class="num">期收益</th><th class="num">净值</th><th class="num">中枢</th><th class="num">3年分位</th><th class="num">换手</th></tr>` +
     [...rs].reverse().map(r => `<tr><td>${r.date}</td>
       <td class="num">${r.week_return == null ? '—' : fmtPct(r.week_return)}</td>
       <td class="num">${r.cum_nav.toFixed(4)}</td><td class="num">${r.center.toFixed(1)}%</td>
@@ -211,12 +211,12 @@ function render() {
   drawBars(); drawNav(); drawPrem();
 }
 
-// ---------- 每周收益柱状图 ----------
+// ---------- 每期收益柱状图 ----------
 function drawBars() {
   const data = RECORDS.filter(r => r.week_return != null);
   const W = 920, H = 240, m = { t: 16, r: 12, b: 26, l: 46 };
   const el = $('#barChart');
-  if (!data.length) { el.innerHTML = '<div class="note">首期建仓后，下周五产生第一根收益柱</div>'; return; }
+  if (!data.length) { el.innerHTML = '<div class="note">首期建仓后，下期周五产生第一根收益柱</div>'; return; }
   const vmax = Math.max(0.005, ...data.map(d => Math.abs(d.week_return)));
   const y = v => m.t + (H - m.t - m.b) * (1 - (v + vmax) / (2 * vmax));
   const iw = (W - m.l - m.r) / data.length, bw = Math.min(34, Math.max(6, iw - 4));
@@ -233,7 +233,7 @@ function drawBars() {
   el.innerHTML = svgWrap(W, H, g);
   el.querySelectorAll('.bar').forEach(b => {
     b.onmousemove = e => { const d = data[+b.dataset.i];
-      showTT(e, `<b>${d.date}</b><br>周收益 ${fmtPct(d.week_return)}<br>净值 ${d.cum_nav.toFixed(4)} · 换手 ${(d.turnover * 100).toFixed(0)}%`); };
+      showTT(e, `<b>${d.date}</b><br>期收益 ${fmtPct(d.week_return)}<br>净值 ${d.cum_nav.toFixed(4)} · 换手 ${(d.turnover * 100).toFixed(0)}%`); };
     b.onmouseleave = hideTT;
   });
 }
