@@ -41,12 +41,11 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
     kicked = prev_set - cur_set
     change_line = ""
     if new_in:
-        new_names = [h["name"] for h in holdings if h["code"] in new_in]
-        change_line += f"\n🆕 新入选: {', '.join(new_names)}"
+        new_items = [f"{h['code']} {h['name']}" for h in holdings if h["code"] in new_in]
+        change_line += f"\n🆕 买入 {len(new_in)} 只: {', '.join(new_items)}"
     if kicked:
-        kicked_info = [h for h in prev["holdings"] if h["code"] in kicked]
-        kicked_names = [f"{h['name']}" for h in kicked_info]
-        change_line += f"\n🚫 调出: {', '.join(kicked_names)}"
+        kicked_items = [f"{h['code']} {h['name']}" for h in prev["holdings"] if h["code"] in kicked]
+        change_line += f"\n🚫 卖出 {len(kicked)} 只: {', '.join(kicked_items)}"
 
     wr_text = f"{week_return*100:+.2f}%" if week_return is not None else "首期"
     light_text = f"{LIGHT_EMOJI.get(light, '')} {light.upper()}"
