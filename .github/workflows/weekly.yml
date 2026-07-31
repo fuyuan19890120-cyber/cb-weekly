@@ -42,6 +42,9 @@ jobs:
 
       - name: Run bi-weekly strategy
         if: env.RUN == 'true'
+        env:
+          CB_REDIS_URL: ${{ secrets.CB_REDIS_URL }}
+          CB_FEISHU_WEBHOOK: ${{ secrets.CB_FEISHU_WEBHOOK }}
         run: python scripts/weekly_run.py
 
       - name: Commit & push data

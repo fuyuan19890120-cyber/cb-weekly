@@ -15,11 +15,74 @@ from datetime import datetime, timezone, timedelta
 
 DATA = Path(os.environ.get("CB_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
 N = 20
-COST_RT = 0.001            # 双边成本, 计入净值
-MIN_SIZE_YI = 0.3           # 最小剩余规模(亿), Tushare remain_size
+COST_RT = 0.001
+MIN_SIZE_YI = 0.3
 GOOD = {"AAA", "AA+", "AA", "AA-", "AA+sti", "AAsti", "AA-sti"}
 CST = timezone(timedelta(hours=8))
 today = datetime.now(CST).strftime("%Y-%m-%d")
+
+LIGHT_EMOJI = {"red": "🔴", "yellow": "🟡", "green": "🟢"}
+
+
+def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
+                       turnover, holdings, prev, missing):
+    """发送飞书卡片消息 — 20只双低名单 + 信号灯 + 收益"""
+    import urllib.request
+
+    # 持仓表格
+    rows = []
+    for i, h in enumerate(holdings, 1):
+        rows.append(f"{i:2d}. {h['name']}  ¥{h['price']:.1f}  溢价{h['prem']:.1f}%  双低{h['dl']:.1f}  {h['rating']}")
+
+    # 上期变动
+    prev_set = {h["code"] for h in prev["holdings"]} if prev else set()
+    cur_set = {h["code"] for h in holdings}
+    new_in = cur_set - prev_set
+    kicked = prev_set - cur_set
+    change_line = ""
+    if new_in:
+        new_names = [h["name"] for h in holdings if h["code"] in new_in]
+        change_line += f"\n🆕 新入选: {', '.join(new_names)}"
+    if kicked:
+        kicked_info = [h for h in prev["holdings"] if h["code"] in kicked]
+        kicked_names = [f"{h['name']}" for h in kicked_info]
+        change_line += f"\n🚫 调出: {', '.join(kicked_names)}"
+
+    wr_text = f"{week_return*100:+.2f}%" if week_return is not None else "首期"
+    light_text = f"{LIGHT_EMOJI.get(light, '')} {light.upper()}"
+
+    card = {
+        "msg_type": "interactive",
+        "card": {
+            "header": {
+                "title": {"content": f"📊 双低可转债 · {date}", "tag": "plain_text"},
+                "template": "blue"
+            },
+            "elements": [
+                {"tag": "div", "text": {"tag": "lark_md",
+                 "content": f"**信号灯 {light_text}**　　溢价率中枢 **{center:.1f}%** (3年分位 {pct3y:.0f}%)"}},
+                {"tag": "div", "text": {"tag": "lark_md",
+                 "content": f"上期收益 {wr_text}　|　净值 **{cum_nav:.4f}**　|　换手 {(turnover or 0)*100:.0f}%"}},
+                {"tag": "hr"},
+                {"tag": "div", "text": {"tag": "lark_md",
+                 "content": "**本期持仓 20 只** (等权, 双低排序):\n\n" + "\n".join(rows)}},
+            ]
+        }
+    }
+    if change_line.strip():
+        card["card"]["elements"].insert(3, {"tag": "div", "text": {"tag": "lark_md",
+            "content": change_line.strip()}})
+    if missing:
+        card["card"]["elements"].append({"tag": "div", "text": {"tag": "lark_md",
+            "content": f"⚠️ {len(missing)} 只退市/强赎: {', '.join(missing)}"}})
+    card["card"]["elements"].append({"tag": "hr"})
+    card["card"]["elements"].append({"tag": "note",
+        "elements": [{"tag": "plain_text", "content": f"GitHub Actions 自动生成 · {date}"}]})
+
+    req = urllib.request.Request(webhook,
+        data=json.dumps(card).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=10)
 
 # ---------- 拉取实时快照 (带重试) ----------
 spot = None
@@ -112,3 +175,24 @@ wr = f"{week_return*100:+.2f}%" if week_return is not None else "—(首期)"
 print(f"完成: 中枢{center:.1f}%(3年分位{pct3y:.0f}%,{light}) | 上周收益 {wr} | 净值 {cum_nav:.4f} | 新名单{len(new_hold)}只 换手{(turnover or 0)*100:.0f}%")
 if missing:
     print(f"注意: {len(missing)} 只持仓已退市/强赎按0%近似: {missing}")
+
+# ---------- Redis IPC: 可选发布 ----------
+if os.environ.get("CB_REDIS_URL") or os.environ.get("CB_REDIS_HOST"):
+    try:
+        from scripts.redis_config import build_signal, push_signal
+        meta = {"date": today, "center": round(center, 2), "center_pct3y": round(pct3y, 1), "light": light}
+        sig = build_signal(new_hold, meta)
+        push_signal(sig)
+        print(f"📡 Redis 已发布: {today}")
+    except Exception as e:
+        print(f"⚠️ Redis 发布失败 (不影响选券结果): {e}")
+
+# ---------- 飞书通知: 可选推送 ----------
+FEISHU_WEBHOOK = os.environ.get("CB_FEISHU_WEBHOOK", "")
+if FEISHU_WEBHOOK:
+    try:
+        _send_feishu_card(FEISHU_WEBHOOK, today, center, pct3y, light, week_return, cum_nav,
+                           turnover, new_hold, prev, missing)
+        print(f"📱 飞书已推送: {today}")
+    except Exception as e:
+        print(f"⚠️ 飞书推送失败 (不影响选券结果): {e}")
