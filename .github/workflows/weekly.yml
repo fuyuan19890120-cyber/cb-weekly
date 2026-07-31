@@ -53,6 +53,7 @@ jobs:
         run: python scripts/weekly_run.py
 
       - name: Commit & push data
+        if: env.RUN == 'true'
         run: |
           git config user.name "cb-weekly-bot"
           git config user.email "actions@users.noreply.github.com"

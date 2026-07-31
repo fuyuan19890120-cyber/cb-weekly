@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""cb-weekly 双周自动运行 (GitHub Actions, 北京时间周五 14:35 前后, 每两周)
+"""cb-weekly 双周自动运行 (GitHub Actions, 北京时间周五 13:00, 每两周)
 流程: 拉实时快照 -> 结算上期持仓收益 -> 更新溢价率中枢 -> 排雷选出新一期双低20只 -> 写回 data/
 排雷: 价格≥100 + 评级≥AA- + 正股基本面 + 剩余规模≥0.3亿 (Tushare)
 幂等: 同一天重复运行会覆盖当天记录而不是重复追加
+注意: 13:00 为午盘数据, 非全日收盘价; 如需收盘数据须改到 15:30 后
 """
 import socket
 socket.setdefaulttimeout(25)
@@ -81,7 +82,14 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
     req = urllib.request.Request(webhook,
         data=json.dumps(card).encode("utf-8"),
         headers={"Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=10)
+    for attempt in range(3):
+        try:
+            urllib.request.urlopen(req, timeout=10)
+            return
+        except Exception as e:
+            if attempt == 2:
+                raise
+            time.sleep(2 * (attempt + 1))
 
 # ---------- 拉取实时快照 (带重试) ----------
 spot = None
@@ -113,16 +121,37 @@ if size_cache.exists():
     sz_df = pd.read_csv(size_cache, dtype=str)
     sz_df['remain_size_yi'] = pd.to_numeric(sz_df['remain_size'], errors='coerce') / 100_000_000
     size_ok = set(sz_df[sz_df['remain_size_yi'] >= MIN_SIZE_YI]['code6'])
-    print(f"剩余规模≥{MIN_SIZE_YI}亿: {len(size_ok)} 只缓存")
+    cache_mtime = datetime.fromtimestamp(size_cache.stat().st_mtime).strftime("%Y-%m-%d")
+    cache_days = (datetime.now() - datetime.fromtimestamp(size_cache.stat().st_mtime)).days
+    print(f"剩余规模≥{MIN_SIZE_YI}亿: {len(size_ok)} 只缓存 (更新于 {cache_mtime})")
+    if cache_days > 90:
+        print(f"⚠️ remain_size 缓存已 {cache_days} 天未更新, 规模数据可能过时")
 else:
-    # GitHub Actions 无法连 Tushare, 使用宽松默认(全部通过)
     size_ok = set(live.code)
     print("无 remain_size 缓存, 跳过规模过滤")
 
-# ---------- 载入历史 ----------
-hist = pd.read_csv(DATA / "premium_history.csv", parse_dates=["date"]).set_index("date")["median_prem"]
-mined = set(pd.read_csv(DATA / "mined_stocks.csv")["stock"].astype(str).str.zfill(6))
-records = json.load(open(DATA / "holdings.json", encoding="utf-8"))
+# ---------- 空数据保护 ----------
+if not live.empty:
+    center_raw = live.prem.median()
+else:
+    print("无有效存续转债, 本周跳过"); sys.exit(1)
+if pd.isna(center_raw):
+    print("溢价率中位数为空, 本周跳过"); sys.exit(1)
+center = float(center_raw)
+
+# ---------- 载入历史 (首次运行用默认值) ----------
+try:
+    hist = pd.read_csv(DATA / "premium_history.csv", parse_dates=["date"]).set_index("date")["median_prem"]
+except (FileNotFoundError, KeyError):
+    hist = pd.Series(dtype=float)
+try:
+    mined = set(pd.read_csv(DATA / "mined_stocks.csv")["stock"].astype(str).str.zfill(6))
+except FileNotFoundError:
+    mined = set()
+try:
+    records = json.load(open(DATA / "holdings.json", encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError):
+    records = []
 
 # ---------- 结算上周持仓 ----------
 prev = records[-1] if records else None
@@ -136,22 +165,28 @@ if prev:
     for h in prev["holdings"]:
         p_now = price_map.get(h["code"])
         if p_now is None:
-            missing.append(h["code"]); rets.append(0.0)   # 退市/强赎: 按0近似, 记录明细
+            # 退市/强赎: 按面值100近似 (实际=面值+当期利息, 误差通常<2%)
+            missing.append(h["code"]); rets.append(100.0 / h["price"] - 1)
         else:
             rets.append(p_now / h["price"] - 1)
     week_return = float(np.mean(rets)) if rets else 0.0
+    # NaN/Inf 防护 (价格异常导致)
+    if not np.isfinite(week_return):
+        print(f"⚠️ 周收益异常 ({week_return}), 重置为 0"); week_return = 0.0
 
 # ---------- 溢价率中枢 ----------
-center = float(live.prem.median())
 hist.loc[pd.Timestamp(today)] = round(center, 2)
 hist = hist[~hist.index.duplicated(keep="last")].sort_index()
 window = hist.tail(756)
-pct3y = float((window <= center).mean() * 100)
+pct3y = float((window <= center).mean() * 100) if len(window) > 0 else 50.0
 light = "red" if pct3y > 85 else ("yellow" if pct3y > 60 else "green")
 
 # ---------- 排雷 + 新一期名单 ----------
 qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)]
 top = qual.nsmallest(N, "dl")
+n_got = len(top)
+if n_got < N:
+    print(f"⚠️ 合格券仅 {n_got} 只 (不足 {N}), 检查过滤条件: 价格≥100={len(live[live.price>=100])} 评级OK={len(live[live.rating.isin(GOOD)])} 未排雷={len(live[~live.stk.isin(mined)])} 规模OK={len(live[live.code.isin(size_ok)])}")
 new_hold = [{"code": r.code, "name": r.name, "price": round(r.price, 2), "prem": round(r.prem, 1),
              "dl": round(r.dl, 1), "rating": r.rating} for r in top.itertuples()]
 if prev:
