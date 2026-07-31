@@ -112,6 +112,16 @@ spot["rating"] = spot["信用评级"].astype(str).str.strip()
 spot["name"] = spot["债券简称"].astype(str)
 live = spot[spot.price.gt(0) & spot.prem.between(-40, 500)].copy()
 live["dl"] = live.price + live.prem
+
+# ---------- 排除未上市债券 ----------
+if "上市时间" in spot.columns:
+    listed = pd.to_datetime(spot["上市时间"], errors="coerce")
+    pre_list = (spot["code"].isin(live.code)) & listed.isna()
+    n_pre = pre_list.sum()
+    if n_pre:
+        pre_codes = spot.loc[pre_list, ["code", "name"]].values.tolist()
+        print(f"排除 {n_pre} 只未上市转债: {', '.join(f'{c} {n}' for c, n in pre_codes)}")
+        live = live[live.code.isin(spot.loc[~pre_list, "code"])]
 print(f"存续转债 {len(live)} 只 @ {today}")
 
 # ---------- 加载 Tushare remain_size (排除微型债) ----------
