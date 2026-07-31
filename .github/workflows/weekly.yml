@@ -2,7 +2,7 @@ name: weekly-cb-run
 
 on:
   schedule:
-    - cron: '0 5 * * 5'   # UTC 05:00 周五 = 北京时间 13:00, 每周执行
+    - cron: '0 3 * * 5'   # UTC 03:00 = 北京时间 11:00, 留3h余量应对Actions延迟, 通常13:00前到达
   workflow_dispatch: {}     # 支持手动触发
 
 permissions:
