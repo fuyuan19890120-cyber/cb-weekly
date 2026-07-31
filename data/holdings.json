@@ -722,15 +722,6 @@
   ],
   "holdings": [
    {
-    "code": "110074",
-    "name": "精达转债",
-    "price": 100.0,
-    "prem": 0.0,
-    "dl": 100.0,
-    "rating": "AA",
-    "conv_value": null
-   },
-   {
     "code": "113605",
     "name": "大参转债",
     "price": 118.63,
@@ -900,6 +891,15 @@
     "dl": 161.1,
     "rating": "AAA",
     "conv_value": 90.12
+   },
+   {
+    "code": "127110",
+    "name": "广核转债",
+    "price": 139.09,
+    "prem": 22.4,
+    "dl": 161.4,
+    "rating": "AAA",
+    "conv_value": 113.69
    }
   ]
  }
