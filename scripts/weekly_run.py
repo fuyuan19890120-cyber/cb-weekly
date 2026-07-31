@@ -32,7 +32,7 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
     # 持仓表格
     rows = []
     for i, h in enumerate(holdings, 1):
-        rows.append(f"{i:2d}. {h['name']}  ¥{h['price']:.1f}  溢价{h['prem']:.1f}%  双低{h['dl']:.1f}  {h['rating']}")
+        rows.append(f"{i:2d}. {h['code']} {h['name']}  ¥{h['price']:.1f}  溢价{h['prem']:.1f}%  双低{h['dl']:.1f}  {h['rating']}")
 
     # 上期变动
     prev_set = {h["code"] for h in prev["holdings"]} if prev else set()
