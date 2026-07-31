@@ -711,8 +711,8 @@
   "center_pct3y": 98.9,
   "light": "red",
   "week_return": 0.0246,
-  "turnover": 0.3,
-  "cum_nav": 1.06248,
+  "turnover": 0.45,
+  "cum_nav": 1.06233,
   "missing": [
    "118074",
    "127115",
@@ -727,15 +727,8 @@
     "price": 100.0,
     "prem": 0.0,
     "dl": 100.0,
-    "rating": "AA"
-   },
-   {
-    "code": "113658",
-    "name": "密卫转债",
-    "price": 108.3,
-    "prem": 0.3,
-    "dl": 108.6,
-    "rating": "AA-"
+    "rating": "AA",
+    "conv_value": null
    },
    {
     "code": "113605",
@@ -743,7 +736,8 @@
     "price": 118.63,
     "prem": 5.8,
     "dl": 124.5,
-    "rating": "AA"
+    "rating": "AA",
+    "conv_value": 112.1
    },
    {
     "code": "128134",
@@ -751,15 +745,8 @@
     "price": 122.39,
     "prem": 3.2,
     "dl": 125.6,
-    "rating": "AA"
-   },
-   {
-    "code": "128128",
-    "name": "齐翔转2",
-    "price": 110.11,
-    "prem": 16.9,
-    "dl": 127.0,
-    "rating": "AA"
+    "rating": "AA",
+    "conv_value": 118.64
    },
    {
     "code": "113056",
@@ -767,7 +754,8 @@
     "price": 128.6,
     "prem": 5.4,
     "dl": 134.0,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 122.02
    },
    {
     "code": "110075",
@@ -775,7 +763,8 @@
     "price": 107.5,
     "prem": 27.6,
     "dl": 135.1,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 84.28
    },
    {
     "code": "128142",
@@ -783,7 +772,8 @@
     "price": 121.6,
     "prem": 17.3,
     "dl": 138.9,
-    "rating": "AA"
+    "rating": "AA",
+    "conv_value": 103.66
    },
    {
     "code": "110076",
@@ -791,15 +781,8 @@
     "price": 121.14,
     "prem": 20.3,
     "dl": 141.4,
-    "rating": "AA"
-   },
-   {
-    "code": "123064",
-    "name": "万孚转债",
-    "price": 110.04,
-    "prem": 32.1,
-    "dl": 142.2,
-    "rating": "AA"
+    "rating": "AA",
+    "conv_value": 100.73
    },
    {
     "code": "127027",
@@ -807,7 +790,8 @@
     "price": 113.45,
     "prem": 28.8,
     "dl": 142.3,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 88.05
    },
    {
     "code": "123107",
@@ -815,7 +799,8 @@
     "price": 114.94,
     "prem": 31.6,
     "dl": 146.6,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 87.32
    },
    {
     "code": "127040",
@@ -823,7 +808,8 @@
     "price": 128.32,
     "prem": 19.7,
     "dl": 148.0,
-    "rating": "AA+"
+    "rating": "AA+",
+    "conv_value": 107.21
    },
    {
     "code": "113681",
@@ -831,15 +817,8 @@
     "price": 139.05,
     "prem": 10.9,
     "dl": 150.0,
-    "rating": "AA-"
-   },
-   {
-    "code": "118053",
-    "name": "正帆转债",
-    "price": 145.56,
-    "prem": 7.3,
-    "dl": 152.9,
-    "rating": "AA"
+    "rating": "AA-",
+    "conv_value": 125.39
    },
    {
     "code": "127067",
@@ -847,7 +826,8 @@
     "price": 154.45,
     "prem": 0.4,
     "dl": 154.9,
-    "rating": "AA+"
+    "rating": "AA+",
+    "conv_value": 153.78
    },
    {
     "code": "128136",
@@ -855,7 +835,8 @@
     "price": 130.8,
     "prem": 24.4,
     "dl": 155.2,
-    "rating": "AA+"
+    "rating": "AA+",
+    "conv_value": 105.12
    },
    {
     "code": "113043",
@@ -863,7 +844,8 @@
     "price": 131.16,
     "prem": 24.6,
     "dl": 155.8,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 105.26
    },
    {
     "code": "127056",
@@ -871,7 +853,8 @@
     "price": 132.3,
     "prem": 23.8,
     "dl": 156.1,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 106.91
    },
    {
     "code": "113051",
@@ -879,7 +862,44 @@
     "price": 132.11,
     "prem": 24.3,
     "dl": 156.4,
-    "rating": "AAA"
+    "rating": "AAA",
+    "conv_value": 106.31
+   },
+   {
+    "code": "113058",
+    "name": "友发转债",
+    "price": 138.6,
+    "prem": 19.6,
+    "dl": 158.2,
+    "rating": "AA",
+    "conv_value": 115.85
+   },
+   {
+    "code": "113631",
+    "name": "皖天转债",
+    "price": 138.66,
+    "prem": 19.7,
+    "dl": 158.4,
+    "rating": "AA+",
+    "conv_value": 115.82
+   },
+   {
+    "code": "113697",
+    "name": "应流转债",
+    "price": 152.38,
+    "prem": 6.2,
+    "dl": 158.6,
+    "rating": "AA+sti",
+    "conv_value": 143.45
+   },
+   {
+    "code": "127045",
+    "name": "牧原转债",
+    "price": 123.78,
+    "prem": 37.4,
+    "dl": 161.1,
+    "rating": "AAA",
+    "conv_value": 90.12
    }
   ]
  }
