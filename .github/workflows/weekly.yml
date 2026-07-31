@@ -24,16 +24,21 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Check bi-weekly (even ISO week number)
+      - name: Check bi-weekly (even ISO week, manual always runs)
         id: check
         run: |
-          WEEK=$(date -u +%V)
-          if [ $((WEEK % 2)) -eq 0 ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "RUN=true" >> $GITHUB_ENV
-            echo "Even week $WEEK, running..."
+            echo "Manual trigger, running..."
           else
-            echo "RUN=false" >> $GITHUB_ENV
-            echo "Odd week $WEEK, skipping (bi-weekly schedule)"
+            WEEK=$(date -u +%V)
+            if [ $((WEEK % 2)) -eq 0 ]; then
+              echo "RUN=true" >> $GITHUB_ENV
+              echo "Even week $WEEK, running..."
+            else
+              echo "RUN=false" >> $GITHUB_ENV
+              echo "Odd week $WEEK, skipping (bi-weekly schedule)"
+            fi
           fi
 
       - name: Install deps
