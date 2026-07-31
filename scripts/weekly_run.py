@@ -26,7 +26,7 @@ LIGHT_EMOJI = {"red": "🔴", "yellow": "🟡", "green": "🟢"}
 
 
 def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
-                       turnover, holdings, prev, missing, forced):
+                       turnover, holdings, prev, missing, forced, force_warn):
     """发送飞书卡片消息 — 20只双低名单 + 信号灯 + 收益"""
     import urllib.request
 
@@ -76,6 +76,16 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
         forced_items = [f"{h['code']} {h['name']} (转股价值¥{h['conv_value']:.0f})" for h in forced]
         card["card"]["elements"].append({"tag": "div", "text": {"tag": "lark_md",
             "content": f"🔥 **强赎预警 {len(forced)} 只** — 转股价值≥130, 可能触发强赎:\n" + "\n".join(f"  · {x}" for x in forced_items)}})
+    if force_warn:
+        warn_items = []
+        for code, info in force_warn.items():
+            name = info.get('name', code)
+            day = f" 最后交易 {info['last_day']}" if info.get('last_day') and info['last_day'] != 'NaT' else ''
+            price = f" 强赎价 ¥{info['redeem_price']:.2f}" if info.get('redeem_price') else ''
+            warn_items.append(f"  · {code} {name} — {info['status']}{day}{price}")
+        if warn_items:
+            card["card"]["elements"].insert(2, {"tag": "div", "text": {"tag": "lark_md",
+                "content": f"⚠️ **本期排除 {len(warn_items)} 只强赎券**:\n" + "\n".join(warn_items)}})
     if missing:
         card["card"]["elements"].append({"tag": "div", "text": {"tag": "lark_md",
             "content": f"⚠️ {len(missing)} 只退市/已排除: {', '.join(missing)}"}})
@@ -197,7 +207,34 @@ pct3y = float((window <= center).mean() * 100) if len(window) > 0 else 50.0
 light = "red" if pct3y > 85 else ("yellow" if pct3y > 60 else "green")
 
 # ---------- 排雷 + 新一期名单 ----------
+# 加载强赎黑名单
+force_redeem = set()
+force_warn = {}   # code -> {status, last_day, redeem_price}
+try:
+    redeem_df = ak.bond_cb_redeem_jsl()
+    for _, r in redeem_df.iterrows():
+        code = str(r['代码']).zfill(6)
+        st = str(r.get('强赎状态', '')).strip()
+        if st in ('已公告强赎', '公告要强赎'):
+            force_redeem.add(code)
+            force_warn[code] = {
+                'name': str(r.get('名称', '')),
+                'status': st,
+                'last_day': str(r.get('最后交易日', ''))[:10] if pd.notna(r.get('最后交易日')) else '',
+                'redeem_price': float(r['强赎价']) if pd.notna(r.get('强赎价')) else None,
+            }
+    print(f"强赎黑名单: {len(force_redeem)} 只 (已公告+公告要强赎)")
+except Exception as e:
+    print(f"强赎数据拉取失败 (非致命): {e}")
+
 qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)]
+n_before = len(qual)
+if force_redeem:
+    qual = qual[~qual.code.isin(force_redeem)]
+    excluded = n_before - len(qual)
+    if excluded:
+        ex_codes = live[live.code.isin(force_redeem) & live.code.isin(size_ok)].code.tolist()
+        print(f"排除 {excluded} 只强赎券: {ex_codes}")
 top = qual.nsmallest(N, "dl")
 n_got = len(top)
 if n_got < N:
@@ -245,7 +282,7 @@ FEISHU_WEBHOOK = os.environ.get("CB_FEISHU_WEBHOOK", "")
 if FEISHU_WEBHOOK:
     try:
         _send_feishu_card(FEISHU_WEBHOOK, today, center, pct3y, light, week_return, cum_nav,
-                           turnover, new_hold, prev, missing, forced)
+                           turnover, new_hold, prev, missing, forced, force_warn)
         print(f"📱 飞书已推送: {today}")
     except Exception as e:
         print(f"⚠️ 飞书推送失败 (不影响选券结果): {e}")
