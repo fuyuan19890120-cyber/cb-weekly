@@ -255,6 +255,30 @@ if all_exclude:
         print(f"排除 {n_ex} 只强赎/异常券")
 top = qual.nsmallest(N, "dl")
 n_got = len(top)
+# ---------- 防线③: bond_zh_cov_info 抽查最终名单 (到期/退市) ----------
+info_exclude = set()
+if n_got > 0:
+    top_codes = top.code.tolist()
+    for code in top_codes:
+        try:
+            info = ak.bond_zh_cov_info(symbol=code)
+            is_redeem = str(info['IS_REDEEM'].values[0]) if 'IS_REDEEM' in info.columns else ''
+            delist = info['DELIST_DATE'].values[0] if 'DELIST_DATE' in info.columns else None
+            if is_redeem == '是' and pd.notna(delist):
+                name = str(info['SECURITY_NAME_ABBR'].values[0]) if 'SECURITY_NAME_ABBR' in info.columns else code
+                dl_str = pd.Timestamp(delist).strftime('%Y-%m-%d')
+                info_exclude.add(code)
+                force_warn[code] = {'name': name, 'status': f'到期/退市(DELIST={dl_str})', 'last_day': dl_str, 'redeem_price': None}
+                print(f"  抽查排除: {code} {name} DELIST={dl_str}")
+            time.sleep(0.3)
+        except Exception as e:
+            pass  # 单只查询失败不影响整体
+    if info_exclude:
+        # 从 qual 中排除, 递补新的
+        qual = qual[~qual.code.isin(info_exclude)]
+        top = qual.nsmallest(N, "dl")
+        n_got = len(top)
+        print(f"抽查排除 {len(info_exclude)} 只, 递补后 {n_got} 只")
 if n_got < N:
     print(f"⚠️ 合格券仅 {n_got} 只 (不足 {N}), 检查过滤条件: 价格≥100={len(live[live.price>=100])} 评级OK={len(live[live.rating.isin(GOOD)])} 未排雷={len(live[~live.stk.isin(mined)])} 规模OK={len(live[live.code.isin(size_ok)])}")
 new_hold = [{"code": r.code, "name": r.name, "price": round(r.price, 2), "prem": round(r.prem, 1),
