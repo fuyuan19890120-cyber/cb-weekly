@@ -227,14 +227,32 @@ try:
 except Exception as e:
     print(f"强赎数据拉取失败 (非致命): {e}")
 
+# 强赎检测第二道防线: 转股价/转股价值为NaN的券 (如精达转债, API可能漏掉)
+conv_dead = set()
+if "转股价" in spot.columns:
+    dead_mask = pd.to_numeric(spot["转股价"], errors="coerce").isna()
+    dead_codes = set(spot.loc[dead_mask & spot["code"].isin(live.code), "code"])
+    conv_dead = dead_codes - force_redeem
+    if conv_dead:
+        dead_info = spot[spot["code"].isin(conv_dead)][["code", "name"]].values.tolist()
+        print(f"转股异常(转股价NaN): {len(conv_dead)} 只 — {', '.join(f'{c} {n}' for c, n in dead_info)}")
+        for code in conv_dead:
+            info = spot[spot["code"] == code]
+            force_warn[code] = {
+                'name': str(info["name"].values[0]) if len(info) else code,
+                'status': '转股异常(转股价NaN)',
+                'last_day': '',
+                'redeem_price': None,
+            }
+
 qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)]
 n_before = len(qual)
-if force_redeem:
-    qual = qual[~qual.code.isin(force_redeem)]
-    excluded = n_before - len(qual)
-    if excluded:
-        ex_codes = live[live.code.isin(force_redeem) & live.code.isin(size_ok)].code.tolist()
-        print(f"排除 {excluded} 只强赎券: {ex_codes}")
+all_exclude = force_redeem | conv_dead
+if all_exclude:
+    qual = qual[~qual.code.isin(all_exclude)]
+    n_ex = n_before - len(qual)
+    if n_ex:
+        print(f"排除 {n_ex} 只强赎/异常券")
 top = qual.nsmallest(N, "dl")
 n_got = len(top)
 if n_got < N:
