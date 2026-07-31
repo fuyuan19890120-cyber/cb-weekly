@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""cb-weekly 双周自动运行 (GitHub Actions, 北京时间周五 13:00, 每两周)
+"""cb-weekly 双周自动运行 (GitHub Actions, 北京时间周五 15:30, 每两周)
 流程: 拉实时快照 -> 结算上期持仓收益 -> 更新溢价率中枢 -> 排雷选出新一期双低20只 -> 写回 data/
 排雷: 价格≥100 + 评级≥AA- + 正股基本面 + 剩余规模≥0.3亿 (Tushare)
 幂等: 同一天重复运行会覆盖当天记录而不是重复追加
-注意: 13:00 为午盘数据, 非全日收盘价; 如需收盘数据须改到 15:30 后
+注意: 15:30 为收盘后数据, 此时 AKShare bond_zh_cov() 已更新当日收盘价, 与回测价格时点一致
 """
 import socket
 socket.setdefaulttimeout(25)
