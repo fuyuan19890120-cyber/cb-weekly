@@ -207,43 +207,49 @@ pct3y = float((window <= center).mean() * 100) if len(window) > 0 else 50.0
 light = "red" if pct3y > 85 else ("yellow" if pct3y > 60 else "green")
 
 # ---------- 排雷 + 新一期名单 ----------
-# 加载强赎黑名单
+# 加载强赎黑名单 (防线①: JSL公告)
 force_redeem = set()
 force_warn = {}   # code -> {status, last_day, redeem_price}
-try:
-    redeem_df = ak.bond_cb_redeem_jsl()
-    for _, r in redeem_df.iterrows():
-        code = str(r['代码']).zfill(6)
-        st = str(r.get('强赎状态', '')).strip()
-        if st in ('已公告强赎', '公告要强赎'):
-            force_redeem.add(code)
-            force_warn[code] = {
-                'name': str(r.get('名称', '')),
-                'status': st,
-                'last_day': str(r.get('最后交易日', ''))[:10] if pd.notna(r.get('最后交易日')) else '',
-                'redeem_price': float(r['强赎价']) if pd.notna(r.get('强赎价')) else None,
-            }
-    print(f"强赎黑名单: {len(force_redeem)} 只 (已公告+公告要强赎)")
-except Exception as e:
-    print(f"强赎数据拉取失败 (非致命): {e}")
+for attempt in range(3):
+    try:
+        redeem_df = ak.bond_cb_redeem_jsl()
+        for _, r in redeem_df.iterrows():
+            code = str(r['代码']).zfill(6)
+            st = str(r.get('强赎状态', '')).strip()
+            if st in ('已公告强赎', '公告要强赎'):
+                force_redeem.add(code)
+                force_warn[code] = {
+                    'name': str(r.get('名称', '')),
+                    'status': st,
+                    'last_day': str(r.get('最后交易日', ''))[:10] if pd.notna(r.get('最后交易日')) else '',
+                    'redeem_price': float(r['强赎价']) if pd.notna(r.get('强赎价')) else None,
+                }
+        print(f"强赎黑名单: {len(force_redeem)} 只 (已公告+公告要强赎)")
+        break
+    except Exception as e:
+        if attempt == 2:
+            print(f"⚠️ 强赎数据拉取3次失败, 防线①降级: {e}")
+        else:
+            time.sleep(3 * (attempt + 1))
 
 # 强赎检测第二道防线: 转股价/转股价值为NaN的券 (如精达转债, API可能漏掉)
 conv_dead = set()
-if "转股价" in spot.columns:
-    dead_mask = pd.to_numeric(spot["转股价"], errors="coerce").isna()
-    dead_codes = set(spot.loc[dead_mask & spot["code"].isin(live.code), "code"])
-    conv_dead = dead_codes - force_redeem
-    if conv_dead:
-        dead_info = spot[spot["code"].isin(conv_dead)][["code", "name"]].values.tolist()
-        print(f"转股异常(转股价NaN): {len(conv_dead)} 只 — {', '.join(f'{c} {n}' for c, n in dead_info)}")
-        for code in conv_dead:
-            info = spot[spot["code"] == code]
-            force_warn[code] = {
-                'name': str(info["name"].values[0]) if len(info) else code,
-                'status': '转股异常(转股价NaN)',
-                'last_day': '',
-                'redeem_price': None,
-            }
+nan_cp = pd.to_numeric(spot["转股价"], errors="coerce").isna()
+nan_cv = pd.to_numeric(spot["转股价值"], errors="coerce").isna()
+dead_mask = nan_cp | nan_cv
+dead_codes = set(spot.loc[dead_mask & spot["code"].isin(live.code), "code"])
+conv_dead = dead_codes - force_redeem
+if conv_dead:
+    dead_info = spot[spot["code"].isin(conv_dead)][["code", "name"]].values.tolist()
+    print(f"转股异常(转股价/转股价值NaN): {len(conv_dead)} 只 — {', '.join(f'{c} {n}' for c, n in dead_info)}")
+    for code in conv_dead:
+        info = spot[spot["code"] == code]
+        force_warn[code] = {
+            'name': str(info["name"].values[0]) if len(info) else code,
+            'status': '转股异常(转股价/转股价值NaN)',
+            'last_day': '',
+            'redeem_price': None,
+        }
 
 qual = live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)]
 n_before = len(qual)
@@ -274,8 +280,27 @@ if n_got > 0:
         except Exception as e:
             pass  # 单只查询失败不影响整体
     if info_exclude:
-        # 从 qual 中排除, 递补新的
+        initial_ex = len(info_exclude)
         qual = qual[~qual.code.isin(info_exclude)]
+        # 取 N + exclude_count 只, 对新增递补券也做抽查
+        top = qual.nsmallest(N + initial_ex, "dl")
+        new_codes = [c for c in top.code.tolist() if c not in top_codes]
+        for code in new_codes:
+            try:
+                info = ak.bond_zh_cov_info(symbol=code)
+                is_redeem = str(info['IS_REDEEM'].values[0]) if 'IS_REDEEM' in info.columns else ''
+                delist = info['DELIST_DATE'].values[0] if 'DELIST_DATE' in info.columns else None
+                if is_redeem == '是' and pd.notna(delist):
+                    name = str(info['SECURITY_NAME_ABBR'].values[0]) if 'SECURITY_NAME_ABBR' in info.columns else code
+                    dl_str = pd.Timestamp(delist).strftime('%Y-%m-%d')
+                    info_exclude.add(code)
+                    force_warn[code] = {'name': name, 'status': f'到期/退市(DELIST={dl_str})', 'last_day': dl_str, 'redeem_price': None}
+                    print(f"  递补复查排除: {code} {name} DELIST={dl_str}")
+                time.sleep(0.3)
+            except Exception:
+                pass
+        if len(info_exclude) > initial_ex:
+            qual = qual[~qual.code.isin(info_exclude)]
         top = qual.nsmallest(N, "dl")
         n_got = len(top)
         print(f"抽查排除 {len(info_exclude)} 只, 递补后 {n_got} 只")
