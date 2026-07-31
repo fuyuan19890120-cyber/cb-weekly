@@ -26,7 +26,7 @@ LIGHT_EMOJI = {"red": "🔴", "yellow": "🟡", "green": "🟢"}
 
 
 def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
-                       turnover, holdings, prev, missing):
+                       turnover, holdings, prev, missing, forced):
     """发送飞书卡片消息 — 20只双低名单 + 信号灯 + 收益"""
     import urllib.request
 
@@ -72,9 +72,13 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
     if change_line.strip():
         card["card"]["elements"].insert(3, {"tag": "div", "text": {"tag": "lark_md",
             "content": change_line.strip()}})
+    if forced:
+        forced_items = [f"{h['code']} {h['name']} (转股价值¥{h['conv_value']:.0f})" for h in forced]
+        card["card"]["elements"].append({"tag": "div", "text": {"tag": "lark_md",
+            "content": f"🔥 **强赎预警 {len(forced)} 只** — 转股价值≥130, 可能触发强赎:\n" + "\n".join(f"  · {x}" for x in forced_items)}})
     if missing:
         card["card"]["elements"].append({"tag": "div", "text": {"tag": "lark_md",
-            "content": f"⚠️ {len(missing)} 只退市/强赎: {', '.join(missing)}"}})
+            "content": f"⚠️ {len(missing)} 只退市/已排除: {', '.join(missing)}"}})
     card["card"]["elements"].append({"tag": "hr"})
     card["card"]["elements"].append({"tag": "note",
         "elements": [{"tag": "plain_text", "content": f"GitHub Actions 自动生成 · {date}"}]})
@@ -108,6 +112,7 @@ spot["code"] = spot["债券代码"].astype(str).str.zfill(6)
 spot["stk"] = spot["正股代码"].astype(str).str.zfill(6)
 spot["price"] = pd.to_numeric(spot["债现价"], errors="coerce")
 spot["prem"] = pd.to_numeric(spot["转股溢价率"], errors="coerce")
+spot["conv_value"] = pd.to_numeric(spot["转股价值"], errors="coerce")
 spot["rating"] = spot["信用评级"].astype(str).str.strip()
 spot["name"] = spot["债券简称"].astype(str)
 live = spot[spot.price.gt(0) & spot.prem.between(-40, 500)].copy()
@@ -198,7 +203,11 @@ n_got = len(top)
 if n_got < N:
     print(f"⚠️ 合格券仅 {n_got} 只 (不足 {N}), 检查过滤条件: 价格≥100={len(live[live.price>=100])} 评级OK={len(live[live.rating.isin(GOOD)])} 未排雷={len(live[~live.stk.isin(mined)])} 规模OK={len(live[live.code.isin(size_ok)])}")
 new_hold = [{"code": r.code, "name": r.name, "price": round(r.price, 2), "prem": round(r.prem, 1),
-             "dl": round(r.dl, 1), "rating": r.rating} for r in top.itertuples()]
+             "dl": round(r.dl, 1), "rating": r.rating,
+             "conv_value": round(r.conv_value, 2) if pd.notna(r.conv_value) else None}
+            for r in top.itertuples()]
+# 强赎预警: 转股价值≥130 的券
+forced = [h for h in new_hold if h["conv_value"] and h["conv_value"] >= 130]
 if prev:
     prev_codes = {h["code"] for h in prev["holdings"]}
     turnover = len([h for h in new_hold if h["code"] not in prev_codes]) / max(len(new_hold), 1)
@@ -236,7 +245,7 @@ FEISHU_WEBHOOK = os.environ.get("CB_FEISHU_WEBHOOK", "")
 if FEISHU_WEBHOOK:
     try:
         _send_feishu_card(FEISHU_WEBHOOK, today, center, pct3y, light, week_return, cum_nav,
-                           turnover, new_hold, prev, missing)
+                           turnover, new_hold, prev, missing, forced)
         print(f"📱 飞书已推送: {today}")
     except Exception as e:
         print(f"⚠️ 飞书推送失败 (不影响选券结果): {e}")
