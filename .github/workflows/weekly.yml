@@ -2,20 +2,25 @@ name: weekly-cb-run
 
 on:
   schedule:
-    - cron: '0 3 * * 5'   # UTC 03:00 = 北京时间 11:00, 留3h余量应对Actions延迟, 通常13:00前到达
+    - cron: '37 3 * * 5'   # UTC 03:37 = 北京时间 11:37, 错峰避免整点拥堵
   workflow_dispatch: {}     # 支持手动触发
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: weekly-cb-run
   cancel-in-progress: false
 
 jobs:
-  run:
+  run-and-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,3 +47,16 @@ jobs:
             git commit -m "weekly run $(date -u +%F)"
             git push
           }
+
+      # 直接部署（不依赖 chained workflow trigger）
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
