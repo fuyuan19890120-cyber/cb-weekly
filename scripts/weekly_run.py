@@ -98,7 +98,10 @@ def _send_feishu_card(webhook, date, center, pct3y, light, week_return, cum_nav,
         headers={"Content-Type": "application/json"})
     for attempt in range(3):
         try:
-            urllib.request.urlopen(req, timeout=10)
+            resp = urllib.request.urlopen(req, timeout=10)
+            body = json.loads(resp.read().decode("utf-8"))
+            if body.get("code") != 0:
+                raise RuntimeError(f"飞书 API 返回错误: code={body.get('code')} msg={body.get('msg', '')}")
             return
         except Exception as e:
             if attempt == 2:
