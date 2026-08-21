@@ -307,6 +307,14 @@ if n_got > 0:
         top = qual.nsmallest(N, "dl")
         n_got = len(top)
         print(f"抽查排除 {len(info_exclude)} 只, 递补后 {n_got} 只")
+# ---------- 过滤漏斗统计 (每期打印各过滤排除规模, 监控是否误杀) ----------
+n_price = len(live[live.price >= 100])
+n_rating = len(live[(live.price >= 100) & live.rating.isin(GOOD)])
+n_mine = len(live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined)])
+n_size = len(live[(live.price >= 100) & live.rating.isin(GOOD) & ~live.stk.isin(mined) & live.code.isin(size_ok)])
+print(f"过滤漏斗: 存续{len(live)} | 价≥100:{n_price}(-{len(live)-n_price}) | 评级:{n_rating}(-{n_price-n_rating}) | "
+      f"正股雷:{n_mine}(-{n_rating-n_mine}) | 规模≥0.3亿:{n_size}(-{n_mine-n_size}) | "
+      f"强赎{len(force_redeem)}+异常{len(conv_dead)}+抽查{len(info_exclude)} | 最终{n_got}")
 if n_got < N:
     print(f"⚠️ 合格券仅 {n_got} 只 (不足 {N}), 检查过滤条件: 价格≥100={len(live[live.price>=100])} 评级OK={len(live[live.rating.isin(GOOD)])} 未排雷={len(live[~live.stk.isin(mined)])} 规模OK={len(live[live.code.isin(size_ok)])}")
 new_hold = [{"code": r.code, "name": r.name, "price": round(r.price, 2), "prem": round(r.prem, 1),
