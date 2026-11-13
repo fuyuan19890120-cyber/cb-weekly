@@ -3594,5 +3594,197 @@
     "conv_value": 95.39
    }
   ]
+ },
+ {
+  "date": "2026-11-13",
+  "center": 57.63,
+  "center_pct3y": 97.9,
+  "light": "red",
+  "week_return": -0.01659,
+  "turnover": 0.1,
+  "cum_nav": 0.97185,
+  "missing": [],
+  "holdings": [
+   {
+    "code": "123107",
+    "name": "温氏转债",
+    "price": 114.2,
+    "prem": 6.1,
+    "dl": 120.3,
+    "rating": "AAA",
+    "conv_value": 107.64
+   },
+   {
+    "code": "127040",
+    "name": "国泰转债",
+    "price": 114.87,
+    "prem": 9.1,
+    "dl": 123.9,
+    "rating": "AA+",
+    "conv_value": 105.31
+   },
+   {
+    "code": "113056",
+    "name": "重银转债",
+    "price": 123.45,
+    "prem": 0.8,
+    "dl": 124.3,
+    "rating": "AAA",
+    "conv_value": 122.45
+   },
+   {
+    "code": "123091",
+    "name": "长海转债",
+    "price": 111.42,
+    "prem": 14.4,
+    "dl": 125.8,
+    "rating": "AA",
+    "conv_value": 97.36
+   },
+   {
+    "code": "127045",
+    "name": "牧原转债",
+    "price": 117.63,
+    "prem": 11.2,
+    "dl": 128.8,
+    "rating": "AAA",
+    "conv_value": 105.82
+   },
+   {
+    "code": "113631",
+    "name": "皖天转债",
+    "price": 124.63,
+    "prem": 5.1,
+    "dl": 129.7,
+    "rating": "AA+",
+    "conv_value": 118.58
+   },
+   {
+    "code": "127110",
+    "name": "广核转债",
+    "price": 130.4,
+    "prem": -0.0,
+    "dl": 130.4,
+    "rating": "AAA",
+    "conv_value": 130.45
+   },
+   {
+    "code": "111000",
+    "name": "起帆转债",
+    "price": 127.47,
+    "prem": 8.6,
+    "dl": 136.1,
+    "rating": "AA-",
+    "conv_value": 117.35
+   },
+   {
+    "code": "113058",
+    "name": "友发转债",
+    "price": 120.32,
+    "prem": 16.4,
+    "dl": 136.7,
+    "rating": "AA",
+    "conv_value": 103.35
+   },
+   {
+    "code": "113681",
+    "name": "镇洋转债",
+    "price": 132.84,
+    "prem": 4.3,
+    "dl": 137.2,
+    "rating": "AA-",
+    "conv_value": 127.31
+   },
+   {
+    "code": "113051",
+    "name": "节能转债",
+    "price": 111.85,
+    "prem": 26.3,
+    "dl": 138.2,
+    "rating": "AAA",
+    "conv_value": 88.55
+   },
+   {
+    "code": "127056",
+    "name": "中特转债",
+    "price": 115.66,
+    "prem": 27.3,
+    "dl": 142.9,
+    "rating": "AAA",
+    "conv_value": 90.87
+   },
+   {
+    "code": "127031",
+    "name": "洋丰转债",
+    "price": 113.68,
+    "prem": 29.6,
+    "dl": 143.2,
+    "rating": "AA",
+    "conv_value": 87.73
+   },
+   {
+    "code": "123150",
+    "name": "九强转债",
+    "price": 128.42,
+    "prem": 16.1,
+    "dl": 144.6,
+    "rating": "AA-",
+    "conv_value": 110.57
+   },
+   {
+    "code": "113054",
+    "name": "绿动转债",
+    "price": 118.88,
+    "prem": 25.7,
+    "dl": 144.6,
+    "rating": "AA+",
+    "conv_value": 94.58
+   },
+   {
+    "code": "123104",
+    "name": "卫宁转债",
+    "price": 121.42,
+    "prem": 26.8,
+    "dl": 148.3,
+    "rating": "AA",
+    "conv_value": 95.73
+   },
+   {
+    "code": "113691",
+    "name": "和邦转债",
+    "price": 123.89,
+    "prem": 24.5,
+    "dl": 148.4,
+    "rating": "AA",
+    "conv_value": 99.5
+   },
+   {
+    "code": "110084",
+    "name": "贵燃转债",
+    "price": 120.78,
+    "prem": 29.9,
+    "dl": 150.7,
+    "rating": "AA",
+    "conv_value": 92.98
+   },
+   {
+    "code": "111017",
+    "name": "蓝天转债",
+    "price": 122.18,
+    "prem": 28.7,
+    "dl": 150.9,
+    "rating": "AA",
+    "conv_value": 94.94
+   },
+   {
+    "code": "127084",
+    "name": "柳工转2",
+    "price": 135.31,
+    "prem": 16.9,
+    "dl": 152.2,
+    "rating": "AAA",
+    "conv_value": 115.73
+   }
+  ]
  }
 ]
